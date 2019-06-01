@@ -1,7 +1,9 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-import numpy as np
 import seaborn as sns
+import numpy as np
+import plotly.plotly as py
+
 
 tox21 = pd.read_csv("C:/Users/jubin/Dropbox/capstone_project/Stream_2_Tox21ToxCast in vitro mechanistic data/medNAS_dili_tt.csv",encoding='cp1252')
 tox21.describe(include=['object'])
@@ -78,8 +80,9 @@ histo(tox21_new,list)
 
 
 # counting the number of drugs
-tox21_new['tgt_abbr'].nunique()
+# tox21_new['tgt_abbr'].nunique()
 
+"""
 to = tox21_new.loc[:,['chnm','CmaxStand','EC','Cratio','Conorm_Class']]
 
 
@@ -90,15 +93,78 @@ for i in to.Conorm_Class.astype('category'):
 for i in to.chnm.astype('category'):
     to[i] = to.chnm == i
 
+"""
+# conversting the test targets
+def score_to_numeric(x):
+    if x=='LessDili':
+        return 0
+    else:
+        return 1
 
+tox21_new['Conorm_Class'] = tox21_new['Conorm_Class'].apply(score_to_numeric)
+
+
+
+
+# Dropping unwanted columns Analysis
+for col in ['chnm','testtarget']:
+    tox21_new = tox21_new.drop(col, axis =1)
+    
+tox_new =tox21_new
+tox_new = pd.get_dummies(tox_new, columns =['testname'], drop_first = True)
+
+        
 # calculate the correlation matrix
-corr = to.corr()
+corr = tox_new.corr()
 
 # plot the heatmap
 sns.heatmap(corr,
         xticklabels=corr.columns,
         yticklabels=corr.columns)
 
+x = tox_new.loc[:,tox_new.columns != 'Conorm_Class'].values
+y = tox_new.loc[:,['Conorm_Class']].values
 
 
-for i in range(len(tox21_new))
+# Standardizing
+
+from sklearn.preprocessing import StandardScaler
+X_std = StandardScaler().fit_transform(x)
+
+# Eigendecomposition - Computing Eigenvectors and Eigenvalues
+
+mean_vec = np.mean(X_std, axis=0)
+cov_mat = (X_std - mean_vec).T.dot((X_std - mean_vec)) / (X_std.shape[0]-1)
+print('Covariance matrix \n%s' %cov_mat)
+
+eig_vals, eig_vecs = np.linalg.eig(cov_mat)
+
+print('Eigenvectors \n%s' %eig_vecs)
+print('\nEigenvalues \n%s' %eig_vals)
+
+
+# Selecting Principal Component
+
+# Sorting eigen values in decreasing order
+sorted_index = eig_vals.argsort()[::-1]
+eig_vals = eig_vals[sorted_index]
+eig_vecs = eig_vecs[:,sorted_index]
+eig_vals
+eig_vecs
+
+eig_vecs = eig_vecs[:,:15]
+eig_vecs
+
+# Transforming data into new sample space
+eig_vec_data = pd.DataFrame(np.real(eig_vecs))
+
+eig_vec_data.columns = ['pc1', 'pc2', 'pc3','pc4','pc5','pc6','pc7','pc8','pc9','pc10','pc11','pc12','pc13','pc14','PC15']
+
+finalDf = pd.concat([eig_vec_data, tox_new[['Conorm_Class']]], axis = 1)
+
+from sklearn.decomposition import PCA as sklearnPCA
+sklearn_pca = sklearnPCA(n_components=15)
+Y_sklearn = sklearn_pca.fit_transform(X_std)
+
+
+
